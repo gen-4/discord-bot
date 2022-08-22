@@ -12,6 +12,7 @@ EXEC_FILE = 'chair_scraper.py'
 RESULT_JSON = 'chair_scrapper_result.json'
 
 DICE_UNICODE = '🎲'
+ADD_ITEM_PRICE = 8_000
 
 load_dotenv(".env")
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -55,15 +56,15 @@ async def on_ready():
     print(f"{bot.user.name} has connected to Discord!")
 
 def init_user():
-    return {
-        'coin': 0.,
-        'bread': 0,
-        'wheat': 0,
-        'axe': 0,
-        'horse': 0,
-        'house': False,
-        'hostal': False
-    }
+    result = {}
+    for item in items:
+        if item in ['house', 'hostal']:
+            result[item] = False
+
+        else:
+            result[item] = 0
+
+    return result
 
 
 @bot.command(name='check-coins', help="Check all users coin status")
@@ -144,15 +145,15 @@ async def check_possesions(context):
         user_possesions[str(author.id)] = init_user()
         result += f"{author.name} joined the game!\n\n"
 
-        user = await bot.fetch_user(author.id)
-        result += f"{user.name}\n"
+    user = await bot.fetch_user(author.id)
+    result += f"{user.name}\n"
 
-        for item in user_possesions[str(author.id)]:
-            if item in ['house', 'hostal']:
-                result += f"\t{item[0].upper() + item[1:]} -> {'obtained' if user_possesions[str(author.id)][item] else 'not obtained'} {items[item]['unicode']}\n"
+    for item in user_possesions[str(author.id)]:
+        if item in ['house', 'hostal']:
+            result += f"\t{item[0].upper() + item[1:]} -> {'obtained' if user_possesions[str(author.id)][item] else 'not obtained'} {items[item]['unicode']}\n"
             
-            else:
-                result += f"\t{item[0].upper() + item[1:]} -> {user_possesions[str(author.id)][item]} {items[item]['unicode']}\n"
+        else:
+            result += f"\t{item[0].upper() + item[1:]} -> {user_possesions[str(author.id)][item]} {items[item]['unicode']}\n"
         
     
     await context.send(result)
@@ -173,21 +174,22 @@ async def send_cheaper_chairs(context, n=5):
 
 @bot.command(name='grind-coin', help="Get coins")
 async def gain_coins(context):
+    result = ''
     author = context.message.author
     if author == bot.user:
         return
 
     if not str(author.id) in user_possesions:
         user_possesions[str(author.id)] = init_user()
-        await context.send(f"{author.name} joined the game!")
+        result = f"{author.name} joined the game!\n"
     
+    
+    seed()
+    if randint(0, 2)  == 2:
+        user_possesions[str(author.id)]['coin'] += 1
+        await context.send(result + f"{author.name} gained 1 coin!")
     else:
-        seed()
-        if randint(0, 2)  == 2:
-            user_possesions[str(author.id)]['coin'] += 1
-            await context.send(f"{author.name} gained 1 coin!")
-        else:
-            await context.send(f"Bad luck!")
+        await context.send(result + f"Bad luck!")
 
 
 @bot.command(name='roll-dice', help="Roll a dice, if 7, double your coins, else loose everything")
@@ -211,6 +213,27 @@ async def roll(context):
     else:
         user_possesions[str(author.id)]['coin'] = 0.
         await context.send(result + "lost all his/her coins!")
+
+
+@bot.command(name='add-item', help="Add new item for 8.000 coins")
+async def add_item(context, name, emoji, price):
+    author = context.message.author
+    if author == bot.user:
+        return
+
+    if not str(author.id) in user_possesions:
+        user_possesions[str(author.id)] = init_user()
+        await context.send(f"{author.name} joined the game!")
+
+    if user_possesions[str(author.id)]['coin'] >= ADD_ITEM_PRICE:
+        user_possesions[str(author.id)]['coin'] -= ADD_ITEM_PRICE
+
+        items[name.lower()] = {
+            'unicode': emoji,
+            'price': float(price)
+        }
+        for user in user_possesions:
+            user_possesions[user][name] = 0
     
 
 
